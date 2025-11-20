@@ -370,7 +370,7 @@ bot.on('callback_query', async (query) => {
 });
 
 // ================= СОЗДАНИЕ ЧЕКОВ ЧЕРЕЗ @ (в чате) =================
-bot.onText(/@MyStarBank_bot/, (msg) => {
+bot.onText(/@MyBankStar_bot/, (msg) => {
     bot.sendMessage(msg.chat.id, '🎫 Создание чека:', {
         reply_markup: {
             inline_keyboard: [
