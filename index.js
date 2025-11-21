@@ -197,7 +197,7 @@ bot.on('inline_query', (query) => {
             parse_mode: 'HTML',
             reply_markup: {
                 inline_keyboard: [[
-                    { text: "🪙 Забрать 50 звезд", url: `https://t.me/MyStarBank_bot?start=create_check_50` }
+                    { text: "🪙 Забрать 50 звезд", url: `https://t.me/MyBankStar_bot?start=create_check_50` }
                 ]]
             }
         },
@@ -212,7 +212,7 @@ bot.on('inline_query', (query) => {
             parse_mode: 'HTML',
             reply_markup: {
                 inline_keyboard: [[
-                    { text: "💫 Забрать 100 звезд", url: `https://t.me/MyStarBank_bot?start=create_check_100` }
+                    { text: "💫 Забрать 100 звезд", url: `https://t.me/MyBankStar_bot?start=create_check_100` }
                 ]]
             }
         }
@@ -314,7 +314,7 @@ bot.on('callback_query', async (query) => {
                         reply_markup: { 
                             inline_keyboard: [[{ 
                                 text: `🪙 Забрать ${amount} звезд`, 
-                                url: `https://t.me/MyStarBank_bot?start=check_${checkId}` 
+                                url: `https://t.me/MyBankStar_bot?start=check_${checkId}` 
                             }]] 
                         }
                     }).catch(photoError => {
@@ -325,7 +325,7 @@ bot.on('callback_query', async (query) => {
                             reply_markup: { 
                                 inline_keyboard: [[{ 
                                     text: `🪙 Забрать ${amount} звезд`, 
-                                    url: `https://t.me/MyStarBank_bot?start=check_${checkId}` 
+                                    url: `https://t.me/MyBankStar_bot?start=check_${checkId}` 
                                 }]] 
                             }
                         });
@@ -350,7 +350,7 @@ bot.on('callback_query', async (query) => {
 });
 
 // СОЗДАНИЕ ЧЕКОВ ЧЕРЕЗ @
-bot.onText(/@MyStarBank_bot/, (msg) => {
+bot.onText(/@MyBankStar_bot/, (msg) => {
     const chatId = msg.chat.id;
     const starsUrl = `${WEB_APP_URL}/stars.jpg`;
     
@@ -483,7 +483,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
                     reply_markup: { 
                         inline_keyboard: [[{ 
                             text: `🪙 Забрать ${amount} звезд`, 
-                            url: `https://t.me/MyStarBank_bot?start=check_${checkId}` 
+                            url: `https://t.me/MyBankStar_bot?start=check_${checkId}` 
                         }]] 
                     }
                 }).catch(photoError => {
@@ -494,7 +494,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
                         reply_markup: { 
                             inline_keyboard: [[{ 
                                 text: `🪙 Забрать ${amount} звезд`, 
-                                url: `https://t.me/MyStarBank_bot?start=check_${checkId}` 
+                                url: `https://t.me/MyBankStar_bot?start=check_${checkId}` 
                             }]] 
                         }
                     });
