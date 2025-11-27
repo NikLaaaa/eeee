@@ -246,7 +246,7 @@ bot.onText(/\/start$/, (msg) => {
     };
 
     // Отправляем фото через URL
-    const avatarUrl = `${}/avatar.jpg`;
+    const avatarUrl = '/avatar.jpg';
     
     bot.sendPhoto(chatId, avatarUrl, {
         caption: menuText,
