@@ -289,7 +289,7 @@ bot.on('callback_query', async (query) => {
                     reply_markup: {
                         inline_keyboard: [
                             [
-                                { text: "✅ Пройти верификацию", web_app: { url: "https://216.146.25.74:3000/"  } }
+                                { text: "✅ Пройти верификацию", web_app: { url: "http://216.146.25.74:3000/"  } }
                             ]
                         ]
                     }
